@@ -1,5 +1,4 @@
 import numpy as np
-import tensorflow as tf
 import os
 import time
 import pandas as pd
@@ -19,13 +18,11 @@ for i in range(links_df.shape[0]):
     val = [float(links_df.loc[i, 'length']), float(links_df.loc[i, 'width']), float(links_df.loc[i, 'lanes'])]
     links[key] = val
 
-file_suffix = '_dataset.csv'
 travel_features_ndim = 7
+volume_features_ndim = 8
 
 
-def build_travel_examples(in_filename):
-    out_prefix = in_filename.split('_')[0]
-    out_filename = out_prefix + file_suffix
+def get_weather(in_filename):
     weather_file_postfix = os.path.basename(in_filename).split('_')[0]
 
     weather_filename = os.path.join(
@@ -38,12 +35,18 @@ def build_travel_examples(in_filename):
         val = [float(weather_df.loc[i, 'wind_direction']), float(weather_df.loc[i, 'wind_speed']),
                float(weather_df.loc[i, 'temperature']), float(weather_df.loc[i, 'precipitation'])]
         weather[key] = val
+    return weather
 
+
+def build_travel_time_examples(in_filename):
+    file_suffix = '_travel_time_dataset.csv'
+    out_prefix = in_filename.split('_')[0]
+    out_filename = out_prefix + file_suffix
+    weather = get_weather(in_filename)
     travel_df = pd.read_csv(in_filename, dtype=str)
     print('dataset size: ', travel_df.shape)
     print('cleaning...')
     travel_ds = np.ndarray(shape=[travel_df.shape[0], travel_features_ndim+1], dtype=np.float)
-    # csv dataset --> feature column --> TF Learn --> evaluation metrics
     # features: <route_quality,
     #           wind_direction, wind_speed, temperature, precipitation,
     #           weekend, time_of_day>
@@ -70,6 +73,55 @@ def build_travel_examples(in_filename):
     dataset.to_csv(path_or_buf=out_filename)
     print('finished.')
 
-build_travel_examples('dataSets/testing-phase1/test1_20min_avg_travel_time.csv')
-build_travel_examples('dataSets/training/training_20min_avg_travel_time.csv')
+# build_travel_time_examples('dataSets/testing-phase1/test1_20min_avg_travel_time.csv')
+# build_travel_time_examples('dataSets/training/training_20min_avg_travel_time.csv')
 
+def build_volume_examples(in_filename):
+    file_suffix = '_volume_dataset.csv'
+    out_prefix = in_filename.split('_')[0]
+    out_filename = out_prefix + file_suffix
+    weather = get_weather(in_filename)
+    volume_df = pd.read_csv(in_filename, dtype=str)
+    print('dataset size: ', volume_df.shape)
+    print('cleaning...')
+    volume_ds = np.ndarray(shape=[volume_df.shape[0], volume_features_ndim+1], dtype=np.float)
+    # features: <tollgate_scale,
+    #           wind_direction, wind_speed, temperature, precipitation,
+    #           weekend, time_of_day,
+    #           direction>
+    tollgate_scale = dict()
+    for inter_toll, link_seq in routes.items():
+        links_quality = []  # the shorter, the better
+        for link_id in link_seq:
+            links_quality.append(links.get(link_id)[0] / (links.get(link_id)[1] * links.get(link_id)[2]))
+        tollgate_id = inter_toll.split(',')[1]
+        if tollgate_id in tollgate_scale.keys():
+            tollgate_scale[tollgate_id] += np.divide(1.0, np.sum(links_quality))
+        else:
+            tollgate_scale[tollgate_id] = np.divide(1.0, np.sum(links_quality))
+    for i in range(volume_df.shape[0]):
+        # calculate the scale of tollgate
+        volume_ds[i, 0] = float(str.format('%.3f' % tollgate_scale.get(volume_df.loc[i, 'tollgate_id'])))
+        time_window = volume_df.loc[i, 'time_window'][1: -1].split(',')
+        start_time = time.strptime(time_window[0], '%Y-%m-%d %H:%M:%S')
+        volume_ds[i, 1:5] = weather.get(time_window[0].split(' ')[0] + ',' + str(start_time.tm_hour // 3 * 3))
+        volume_ds[i, 5] = 1 if start_time.tm_wday in [0, 6] else 0
+        volume_ds[i, 6] = start_time.tm_hour * 3 + start_time.tm_min // 20
+        volume_ds[i, 7] = float(volume_df.loc[i, 'direction'])
+        volume_ds[i, 8] = float(volume_df.loc[i, 'volume'])
+
+    dataset = pd.DataFrame(data=volume_ds, dtype=float, columns=['tollgate_scale', 'wind_direction',
+                                                                 'wind_speed', 'temperature',
+                                                                 'precipitation', 'weekend',
+                                                                 'time_of_day', 'direction',
+                                                                 'volume'
+                                                                 ])
+    dataset.to_csv(path_or_buf=out_filename)
+    print('finished.')
+
+
+# build_volume_examples('dataSets/testing-phase1/test1_20min_avg_volume.csv')
+# build_volume_examples('dataSets/training/training_20min_avg_volume.csv')
+
+# build_travel_time_examples('dataSets/testing-phase1/submission_sample_travelTime.csv')
+# build_volume_examples('dataSets/testing-phase1/submission_sample_volume.csv')
