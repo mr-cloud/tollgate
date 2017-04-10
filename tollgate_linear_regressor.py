@@ -6,41 +6,41 @@ import os
 
 
 # travel time.
-travel_training_df = pd.read_csv('dataSets/training/training_travel_time_dataset.csv', dtype=np.float32, index_col=0)
-travel_training_df = travel_training_df.dropna()
-travel_training_df.wind_direction[travel_training_df.wind_direction > 360.0] = 0.0
-travel_test_df = pd.read_csv('dataSets/testing-phase1/test1_travel_time_dataset.csv', dtype=np.float32, index_col=0)
-travel_test_df = travel_test_df.dropna()
-travel_test_df.wind_direction[travel_test_df.wind_direction > 360.0] = 0.0
-submission_df = pd.read_csv('dataSets/testing-phase1/submission_travel_time_dataset.csv', dtype=np.float32, index_col=0)
-print('before filtered dirty rows, submission size: ', submission_df.shape)
-submission_df = submission_df.dropna()
-submission_df.wind_direction[submission_df.wind_direction > 360.0] = 0.0
-print('after filtered dirty rows, submission size: ', submission_df.shape)
-submission_sample = 'dataSets/testing-phase1/submission_sample_travelTime.csv'
-ylimit = 1.0
-
-# volume.
-# travel_training_df = pd.read_csv('dataSets/training/training_volume_dataset.csv', dtype=np.float32, index_col=0)
+# travel_training_df = pd.read_csv('dataSets/training/training_travel_time_dataset.csv', dtype=np.float32, index_col=0)
 # travel_training_df = travel_training_df.dropna()
 # travel_training_df.wind_direction[travel_training_df.wind_direction > 360.0] = 0.0
-# travel_test_df = pd.read_csv('dataSets/testing-phase1/test1_volume_dataset.csv', dtype=np.float32, index_col=0)
+# travel_test_df = pd.read_csv('dataSets/testing-phase1/test1_travel_time_dataset.csv', dtype=np.float32, index_col=0)
 # travel_test_df = travel_test_df.dropna()
 # travel_test_df.wind_direction[travel_test_df.wind_direction > 360.0] = 0.0
-# submission_df = pd.read_csv('dataSets/testing-phase1/submission_volume_dataset.csv', dtype=np.float32, index_col=0)
+# submission_df = pd.read_csv('dataSets/testing-phase1/submission_travel_time_dataset.csv', dtype=np.float32, index_col=0)
 # print('before filtered dirty rows, submission size: ', submission_df.shape)
 # submission_df = submission_df.dropna()
 # submission_df.wind_direction[submission_df.wind_direction > 360.0] = 0.0
 # print('after filtered dirty rows, submission size: ', submission_df.shape)
-# submission_sample = 'dataSets/testing-phase1/submission_sample_volume.csv'
-# ylimit = 10.0
+# submission_sample = 'dataSets/testing-phase1/submission_sample_travelTime.csv'
+# ylimit = 1.0
+
+# volume.
+travel_training_df = pd.read_csv('dataSets/training/training_volume_dataset.csv', dtype=np.float32, index_col=0)
+travel_training_df = travel_training_df.dropna()
+travel_training_df.wind_direction[travel_training_df.wind_direction > 360.0] = 0.0
+travel_test_df = pd.read_csv('dataSets/testing-phase1/test1_volume_dataset.csv', dtype=np.float32, index_col=0)
+travel_test_df = travel_test_df.dropna()
+travel_test_df.wind_direction[travel_test_df.wind_direction > 360.0] = 0.0
+submission_df = pd.read_csv('dataSets/testing-phase1/submission_volume_dataset.csv', dtype=np.float32, index_col=0)
+print('before filtered dirty rows, submission size: ', submission_df.shape)
+submission_df = submission_df.dropna()
+submission_df.wind_direction[submission_df.wind_direction > 360.0] = 0.0
+print('after filtered dirty rows, submission size: ', submission_df.shape)
+submission_sample = 'dataSets/testing-phase1/submission_sample_volume.csv'
+ylimit = 10.0
 
 
 def feature_normalize(dataset, mu=None, sigma=None):
     if mu is None:
         mu = np.mean(dataset, axis=0)
     if sigma is None:
-        sigma = np.max(dataset, axis=0) - np.min(dataset, axis=0)
+        sigma = np.std(dataset, axis=0) + 0.1  # in case zero division.
     return (dataset - mu) / sigma, mu, sigma
 
 
@@ -86,8 +86,8 @@ with graph.as_default():
     tf_test_labels = tf.constant(test_labels)
 
     global_step = tf.Variable(0)  # count the number of steps taken.
-    initial_learning_rate = 0.5
-    final_learning_rate = 0.1
+    initial_learning_rate = 0.05
+    final_learning_rate = 0.01
     decay_rate = 0.96
     learning_rate = tf.train.exponential_decay(initial_learning_rate, global_step, decay_rate=decay_rate,
                                                decay_steps=num_steps / (
